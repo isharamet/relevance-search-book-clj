@@ -46,6 +46,11 @@
       (async/put! input-ch index-data))
     (future (loop [] (async/<!! (:output-ch es-client))))))
 
+(defn print-search-results
+  [rs]
+  (doseq [hit (get-in rs [:body :hits :hits])]
+    (println (hit :_score) (get-in hit [:_source :title]))))
+
 (defn search
   [q]
   (spandex/request-async
@@ -56,7 +61,7 @@
             {:multi_match
              {:query  q
               :fields ["title^10" "overview"]}}}
-     :success (fn [rs] (println rs))
+     :success print-search-results
      :error   (fn [ex] (println ex))}))
 
 (reindex)
