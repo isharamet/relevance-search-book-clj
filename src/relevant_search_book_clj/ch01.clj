@@ -55,7 +55,7 @@
   [q]
   (spandex/request-async
     es-client
-    {:url "/tmdb/movie/_search"
+    {:url "/tmdb/movie/_search?explain"
      :method :get
      :body {:query
             {:multi_match
@@ -64,6 +64,21 @@
      :success print-search-results
      :error   (fn [ex] (println ex))}))
 
+(defn explain
+  [q]
+  (spandex/request-async
+    es-client
+    {:url "/tmdb/movie/_validate/query?explain"
+     :method :get
+     :body {:query
+            {:multi_match
+             {:query  q
+              :fields ["title^10" "overview"]}}}
+     :success (fn [rs] (clojure.pprint/pprint (:body rs)))
+     :error   (fn [ex] (println ex))}))
+
 (reindex)
 
 (search "basketball with cartoon aliens")
+
+(explain "basketball with cartoon aliens")
