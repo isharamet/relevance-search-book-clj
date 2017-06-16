@@ -13,11 +13,12 @@
 
 (def index-data
   (reduce
-    (fn [acc m]
-      (let [[id {:keys [title overview tagline]}] m]
-        (conj acc
-              {:index {:_index "tmdb", :_type "movie", :_id id}}
-              {:title title, :overview overview, :tagline tagline})))
+    (fn [acc movie]
+      (let [[id {:keys [title overview tagline]}] movie]
+        (conj
+          acc
+          {:index {:_index "tmdb", :_type "movie", :_id id}}
+          {:title title, :overview overview, :tagline tagline})))
     []
     tmdb))
 
@@ -25,34 +26,39 @@
   []
   (do
     (try
-      (spandex/request es-client
-                       {:url "/tmdb"
-                        :method :delete})
+      (spandex/request
+        es-client
+        {:url "/tmdb"
+         :method :delete})
       (catch Exception e
         (println "Unable to delete 'tmdb' index")))
-    (spandex/request es-client
-                     {:url "/tmdb"
-                      :method :put
-                      :body {:settings {:number_of_shardssss 1}}})
-    (let [{:keys [input-ch output-ch]} (spandex/bulk-chan es-client
-                                                          {:flush-threshold 100
-                                                           :flush-interval 5000
-                                                           :max-concurrent-requests 3})]
+    (spandex/request
+      es-client
+      {:url "/tmdb"
+       :method :put
+       :body {:settings {:number_of_shards 1}}})
+    (let [{:keys [input-ch output-ch]}
+          (spandex/bulk-chan
+            es-client
+            {:flush-threshold 100
+             :flush-interval 5000
+             :max-concurrent-requests 3})]
       (async/put! input-ch index-data))
     (future (loop [] (async/<!! (:output-ch es-client))))))
 
+(defn search
+  [q]
+  (spandex/request-async
+    es-client
+    {:url "/tmdb/movie/_search"
+     :method :get
+     :body {:query
+            {:multi_match
+             {:query  q
+              :fields ["title^10" "overview"]}}}
+     :success (fn [rs] (println rs))
+     :error   (fn [ex] (println ex))}))
+
 (reindex)
 
-(defn query
-  [q]
-  (spandex/request-async es-client {:url "/tmdb/movie/_search"
-                                    :method :get
-                                    :body
-                                      {:query
-                                        {:multi_match
-                                          {:query q
-                                           :fields ["title^10" "overview"]}}}
-                                    :success (fn [rs] (println rs))
-                                    :error (fn [ex] (println ex))}))
-
-(query "titanic")
+(search "basketball with cartoon aliens")
