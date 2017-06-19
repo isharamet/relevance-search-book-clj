@@ -77,8 +77,22 @@
      :success (fn [rs] (clojure.pprint/pprint (:body rs)))
      :error   (fn [ex] (println ex))}))
 
+(defn analyze
+  [q]
+  (spandex/request-async
+    es-client
+    {:url "/tmdb/_analyze"
+     :method :get
+     :query-string {:format :yaml}
+     :body {:analyzer :standard
+            :text q}
+     :success (fn [rs] (clojure.pprint/pprint (:body rs)))
+     :error   (fn [ex] (println ex))}))
+
 (reindex)
 
 (search "basketball with cartoon aliens")
 
 (explain "basketball with cartoon aliens")
+
+(analyze "Fire with Fire")
