@@ -66,7 +66,8 @@
      :body {:query
             {:multi_match
              {:query q
-              :fields ["title^10" "overview"]}}}
+              :fields ["title^10" "overview"]}}
+            :size 100}
      :success print-search-results
      :error   (fn [ex] (println ex))}))
 
@@ -131,3 +132,7 @@
 (get-mappings)
 
 (analyze "Fire with Fire" :title)
+
+(explain "basketball with cartoon aliens")
+
+(search "basketball with cartoon aliens")
