@@ -1,4 +1,4 @@
-(ns relevant-search-book-clj.ch01
+(ns relevant-search-book-clj.ch03
   (:require [cheshire.core :as cheshire]
             [qbits.spandex :as spandex]
             [qbits.spandex.utils :as spandex-utils]
@@ -30,7 +30,6 @@
                 settings
                 (assoc settings :mappings mappings))]
      (do
-       (clojure.pprint/pprint body)
        (try
          (spandex/request
            es-client
@@ -56,22 +55,23 @@
   [rs explain]
   (doseq [hit (get-in rs [:body :hits :hits])]
     (do
+      (println (hit :_score) (get-in hit [:_source :title]))
       (if (true? explain)
-        (clojure.pprint/pprint (hit :_explanation)))
-      (println (hit :_score) (get-in hit [:_source :title])))))
+        (clojure.pprint/pprint (hit :_explanation))))))
 
 (defn search
-  ([q] (search q false))
-  ([q explain]
+  [q]
+  (let [{:keys [query fields explain]
+         :or {fields ["title^10" "overview"] explain false}} q]
    (spandex/request-async
      es-client
-     {:url "/tmdb/movie/_search?explain"
+     {:url "/tmdb/movie/_search"
       :method :get
       :body {:query
              {:multi_match
-              {:query q
-               :fields ["title^10" "overview"]}}
-             :size 100
+              {:query query
+               :fields fields}}
+             :size 20
              :explain explain}
       :success (fn [rs] (print-search-results rs explain))
       :error   (fn [ex] (println ex))})))
@@ -114,15 +114,23 @@
      :success (fn [rs] (clojure.pprint/pprint (:body rs)))
      :error   (fn [ex] (println ex))}))
 
+;; Indexing TMDB Movies
+
 (reindex)
 
-(search "basketball with cartoon aliens")
+;; Searching for 'basketball with cartoon aliens'
 
-(explain "basketball with cartoon aliens")
+(search {:query "basketball with cartoon aliens"})
+
+;; Validating the query
+
+(explain {:query "basketball with cartoon aliens"})
+
+;; Analyzing the string
 
 (analyze "Fire with Fire")
 
-;; ---
+;; Reindexing with new settings
 
 (reindex
   {:movie
@@ -134,14 +142,24 @@
      {:type :text
       :analyzer :english}}}})
 
+;; Inspecting the mappings
+
 (get-mappings)
+
+;; Reanalyzing the string
 
 (analyze "Fire with Fire" :title)
 
-(explain "basketball with cartoon aliens")
+;; Searching again
 
-(search "basketball with cartoon aliens")
+(search {:query "basketball with cartoon aliens"})
 
-;; ---
+;; Decomposing Relevance Score With Lucene’s Explain
 
-(search "basketball with cartoon aliens" true)
+(search {:query "basketball with cartoon aliens"
+         :explain true})
+
+;; Fixing Space Jam vs Alien Ranking
+
+(search {:query "basketball with cartoon aliens"
+         :fields ["title^0.1" "overview"]})
