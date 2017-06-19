@@ -23,28 +23,34 @@
     tmdb))
 
 (defn reindex
-  []
-  (do
-    (try
-      (spandex/request
-        es-client
-        {:url "/tmdb"
-         :method :delete})
-      (catch Exception e
-        (println "Unable to delete 'tmdb' index")))
-    (spandex/request
-      es-client
-      {:url "/tmdb"
-       :method :put
-       :body {:settings {:number_of_shards 1}}})
-    (let [{:keys [input-ch output-ch]}
-          (spandex/bulk-chan
-            es-client
-            {:flush-threshold 100
-             :flush-interval 5000
-             :max-concurrent-requests 3})]
-      (async/put! input-ch index-data))
-    (future (loop [] (async/<!! (:output-ch es-client))))))
+  ([] (reindex nil))
+  ([mappings]
+   (let [settings {:settings {:number_of_shards 1}}
+         body (if (nil? mappings)
+                settings
+                (assoc settings :mappings mappings))]
+     (do
+       (clojure.pprint/pprint body)
+       (try
+         (spandex/request
+           es-client
+           {:url "/tmdb"
+            :method :delete})
+         (catch Exception e
+           (println "Unable to delete 'tmdb' index")))
+       (spandex/request
+         es-client
+         {:url "/tmdb"
+          :method :put
+          :body body})
+       (let [{:keys [input-ch output-ch]}
+             (spandex/bulk-chan
+               es-client
+               {:flush-threshold 100
+                :flush-interval 5000
+                :max-concurrent-requests 3})]
+         (async/put! input-ch index-data))
+       (future (loop [] (async/<!! (:output-ch es-client))))))))
 
 (defn print-search-results
   [rs]
@@ -59,7 +65,7 @@
      :method :get
      :body {:query
             {:multi_match
-             {:query  q
+             {:query q
               :fields ["title^10" "overview"]}}}
      :success print-search-results
      :error   (fn [ex] (println ex))}))
@@ -72,20 +78,33 @@
      :method :get
      :body {:query
             {:multi_match
-             {:query  q
+             {:query q
               :fields ["title^10" "overview"]}}}
      :success (fn [rs] (clojure.pprint/pprint (:body rs)))
      :error   (fn [ex] (println ex))}))
 
 (defn analyze
-  [q]
+  ([q] (analyze q nil))
+  ([q field]
+    (let [body {:analyzer :standard
+                :text q}
+          body (if (nil? field)
+                 body
+                 (assoc body :field field))]
+      (spandex/request-async
+        es-client
+        {:url "/tmdb/_analyze"
+         :method :get
+         :body body
+         :success (fn [rs] (clojure.pprint/pprint (:body rs)))
+         :error   (fn [ex] (println ex))}))))
+
+(defn get-mappings
+  []
   (spandex/request-async
     es-client
-    {:url "/tmdb/_analyze"
+    {:url "tmdb/_mappings"
      :method :get
-     :query-string {:format :yaml}
-     :body {:analyzer :standard
-            :text q}
      :success (fn [rs] (clojure.pprint/pprint (:body rs)))
      :error   (fn [ex] (println ex))}))
 
@@ -96,3 +115,19 @@
 (explain "basketball with cartoon aliens")
 
 (analyze "Fire with Fire")
+
+;; ---
+
+(reindex
+  {:movie
+   {:properties
+    {:title
+     {:type :text
+      :analyzer :english}
+     :overview
+     {:type :text
+      :analyzer :english}}}})
+
+(get-mappings)
+
+(analyze "Fire with Fire" :title)
