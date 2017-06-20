@@ -1,15 +1,6 @@
 (ns relevant-search-book-clj.ch03
-  (:require [cheshire.core :as cheshire]
-            [qbits.spandex :as spandex]
-            [qbits.spandex.utils :as spandex-utils]
-            [clojure.core.async :as async]))
-
-(def tmdb
-  (with-open [rdr (clojure.java.io/reader "resources/tmdb.json")]
-    (cheshire/parse-stream rdr true)))
-
-(def es-client
-  (spandex/client {:hosts ["http://localhost:9200"]}))
+  (:require [relevant-search-book-clj.core :refer :all]
+            [qbits.spandex :as spandex]))
 
 (def index-data
   (reduce
@@ -21,35 +12,6 @@
           {:title title, :overview overview, :tagline tagline})))
     []
     tmdb))
-
-(defn reindex
-  ([] (reindex nil))
-  ([mappings]
-   (let [settings {:settings {:number_of_shards 1}}
-         body (if (nil? mappings)
-                settings
-                (assoc settings :mappings mappings))]
-     (do
-       (try
-         (spandex/request
-           es-client
-           {:url "/tmdb"
-            :method :delete})
-         (catch Exception e
-           (println "Unable to delete 'tmdb' index")))
-       (spandex/request
-         es-client
-         {:url "/tmdb"
-          :method :put
-          :body body})
-       (let [{:keys [input-ch output-ch]}
-             (spandex/bulk-chan
-               es-client
-               {:flush-threshold 100
-                :flush-interval 5000
-                :max-concurrent-requests 3})]
-         (async/put! input-ch index-data))
-       (future (loop [] (async/<!! (:output-ch es-client))))))))
 
 (defn print-search-results
   [rs explain]
@@ -116,7 +78,7 @@
 
 ;; Indexing TMDB Movies
 
-(reindex)
+(reindex index-data)
 
 ;; Searching for 'basketball with cartoon aliens'
 
@@ -124,7 +86,7 @@
 
 ;; Validating the query
 
-(explain {:query "basketball with cartoon aliens"})
+(explain "basketball with cartoon aliens")
 
 ;; Analyzing the string
 
@@ -133,6 +95,7 @@
 ;; Reindexing with new settings
 
 (reindex
+  index-data
   {:movie
    {:properties
     {:title
