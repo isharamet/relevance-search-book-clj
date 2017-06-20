@@ -13,14 +13,6 @@
     []
     tmdb))
 
-(defn print-search-results
-  [rs explain]
-  (doseq [hit (get-in rs [:body :hits :hits])]
-    (do
-      (println (hit :_score) (get-in hit [:_source :title]))
-      (if (true? explain)
-        (clojure.pprint/pprint (hit :_explanation))))))
-
 (defn search
   [q]
   (let [{:keys [query fields explain]

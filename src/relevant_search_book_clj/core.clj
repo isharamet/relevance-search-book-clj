@@ -34,3 +34,11 @@
               :max-concurrent-requests 3})]
        (async/put! input-ch index-data))
      (future (loop [] (async/<!! (:output-ch es-client)))))))
+
+(defn print-search-results
+  [rs explain]
+  (doseq [hit (get-in rs [:body :hits :hits])]
+    (do
+      (println (hit :_score) (get-in hit [:_source :title]))
+      (if (true? explain)
+        (clojure.pprint/pprint (hit :_explanation))))))
