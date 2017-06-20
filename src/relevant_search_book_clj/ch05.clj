@@ -22,9 +22,18 @@
      :method :get
      :success (fn [rs] (clojure.pprint/pprint (:body rs)))
      :error   (fn [ex] (println ex))}))
+
 ;; ---
 
-(reindex index-data)
+(reindex
+  index-data
+  {:settings
+   {:number_of_shards 1
+    :index
+     {:analysis
+      {:analyzer
+       {:default
+        {:type :english}}}}}})
 
 (def space-jam-id 2300)
 

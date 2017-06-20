@@ -96,14 +96,17 @@
 
 (reindex
   index-data
-  {:movie
-   {:properties
-    {:title
-     {:type :text
-      :analyzer :english}
-     :overview
-     {:type :text
-      :analyzer :english}}}})
+  {:settings
+   {:number_of_shards 1}
+   :mappings
+    {:movie
+     {:properties
+      {:title
+       {:type :text
+        :analyzer :english}
+       :overview
+        {:type :text
+         :analyzer :english}}}}})
 
 ;; Inspecting the mappings
 
